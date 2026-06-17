@@ -1,0 +1,75 @@
+services:
+  litellm:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: litellm
+    restart: unless-stopped
+    ports:
+      - "4000:4000"
+    environment:
+      # 主金鑰:用來登入 UI 和當作 admin API key,請改成你自己的強密碼
+      LITELLM_MASTER_KEY: ${LITELLM_MASTER_KEY}
+      # 用來加密資料庫裡的 API key 等敏感資料,請改成你自己的隨機字串
+      LITELLM_SALT_KEY: ${LITELLM_SALT_KEY}
+      # PostgreSQL 連線
+      DATABASE_URL: postgresql://litellm:${POSTGRES_PASSWORD}@postgres:5432/litellm
+      # UI 登入帳號(預設 admin,密碼用 master key)
+      UI_USERNAME: admin
+      UI_PASSWORD: ${LITELLM_MASTER_KEY}
+      # Azure Foundry 的金鑰,在 UI 或 config 裡引用
+      AZURE_FOUNDRY_API_KEY: ${AZURE_FOUNDRY_API_KEY}
+      # 開啟 JSON log,方便接 log 收集系統
+      JSON_LOGS: "True"
+      # Prometheus metrics endpoint
+      LITELLM_LOG: INFO
+    volumes:
+      - ./config.yaml:/app/config.yaml:ro
+    command:
+      - "--config=/app/config.yaml"
+      - "--port=4000"
+      - "--num_workers=4"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:4000/health/liveliness"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: litellm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: litellm
+      POSTGRES_USER: litellm
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U litellm -d litellm"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # 不對外暴露 port,只給 litellm 內部連線
+    expose:
+      - "5432"
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: litellm-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=30d'
+
+volumes:
+  postgres_data:
+  prometheus_data:
+

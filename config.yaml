@@ -1,0 +1,52 @@
+model_list:
+  #===== Azure AI Foundry 上的 Claude =====
+  #把 api_base 換成你 Foundry deployment 的實際 endpoint
+  #模型名稱要對應你在 Foundry 部署的 deployment name
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_base: https://dsproject3.services.ai.azure.com/anthropic
+      api_key: os.environ/AZURE_FOUNDRY_API_KEY
+      #Azure Foundry 的價格,請依實際合約調整(以下是參考值)
+      input_cost_per_token: 0.000003
+      output_cost_per_token: 0.000015
+      cache_creation_input_token_cost: 0.000006
+      cache_read_input_token_cost: 0.0000003
+
+  #- model_name: claude-opus-4
+    #litellm_params:
+      #model: azure_ai/claude-opus-4
+      #api_base: https://your-foundry-resource.services.ai.azure.com
+      #api_key: os.environ/AZURE_FOUNDRY_API_KEY
+      #input_cost_per_token: 0.000015
+      #output_cost_per_token: 0.000075
+      #cache_creation_input_token_cost: 0.00001875
+      #cache_read_input_token_cost: 0.0000015
+
+litellm_settings:
+  #把所有請求和成本記到資料庫
+  success_callback: ["prometheus"]
+  failure_callback: ["prometheus"]
+  #請求 timeout(秒)
+  request_timeout: 600
+  #是否在 response 回傳成本資訊
+  return_response_headers: true
+  #啟用 prompt caching 支援
+  cache: true
+  cache_params:
+    type: redis  # 如果不用 redis 可以改成 local 或移除這段
+    host: redis
+    port: 6379
+
+general_settings:
+  #從環境變數讀取 master key
+  master_key: os.environ/LITELLM_MASTER_KEY
+  #資料庫連線
+  database_url: os.environ/DATABASE_URL
+  #啟用 spend tracking
+  store_model_in_db: true
+  store_prompts_in_spend_logs: true
+  #UI 設定
+  ui_access_mode: "admin_only"
+  #禁止從 swagger 直接呼叫(生產環境建議)
+  disable_swagger_page: true
